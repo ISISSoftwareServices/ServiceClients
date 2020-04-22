@@ -1,0 +1,38 @@
+sudo: required
+language: python
+python:
+  - "3.7"
+
+services:
+  - mysql
+
+dist: xenial
+
+before_install:
+  - mysql_upgrade --force
+  - sudo service mysql restart
+  # Need to do this first time
+  - mysql < build/database/reset_autoreduction_db.sql
+
+install:
+  - pip3 install -e .
+  - pip3 install -r requirements.txt
+
+  # ================== setup test environment ==================== #
+  - python3 setup.py test_settings
+  # Externals must be after test_settings
+  - python3 setup.py externals -s activemq,icat
+  - python3 setup.py database
+  - _LOCAL_PYTHON_PATH=$(which python3)
+  - sudo $_LOCAL_PYTHON_PATH setup.py start
+
+script:
+  - py.test build/tests/test_db_generation.py  # perform initial check of database
+  # ================ Functional tests =============== #
+  - py.test --cov=src
+
+  # ================ Static Analysis ================= #
+  - pylint src
+
+after_success:
+  - coveralls
